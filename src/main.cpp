@@ -207,8 +207,8 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
 
   limits = filterHSV(image);
 
-  cv::inRange(image, cv::Vec3b(limits[0], limits[2], limits[4]),
-  cv::Vec3b(limits[1], limits[3], limits[5]), filteredImage);
+  cv::inRange(hsvImage, cv::Scalar(limits[0], limits[2], limits[4]),
+  cv::Scalar(limits[1], limits[3], limits[5]), filteredImage);
 
   cv::erode(filteredImage, filteredImage, cv::Mat());
   cv::erode(filteredImage, filteredImage, cv::Mat());
