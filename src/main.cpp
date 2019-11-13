@@ -29,22 +29,22 @@
 #define THRESHOLD 127
 #define WHITE cv::Vec3b(255, 255, 255)
 
-#define RING_PH1_AVG 3.41E-03
-#define RING_PH2_AVG 4.30E-07
-#define RING_PH1_VAR 0.0003152529 * 1.5
-#define RING_PH2_VAR 0.000000099 * 2
-#define TIE_PH1_AVG 1.40E-03
-#define TIE_PH2_AVG 1.33E-06
-#define TIE_PH1_VAR 4.25E-05 * 1.5
-#define TIE_PH2_VAR 1.0679222222222E-07 * 2
-#define PANTS_PH1_AVG 1.11E-03
-#define PANTS_PH2_AVG 3.12E-07
-#define PANTS_PH1_VAR 0.00010127 * 1.5
-#define PANTS_PH2_VAR 0.000000064 * 2
-#define SHIRT_PH1_AVG 7.71E-04
-#define SHIRT_PH2_AVG 7.05E-08
-#define SHIRT_PH1_VAR 0.000004617 * 2
-#define SHIRT_PH2_VAR 6.8197E-09 * 8
+#define RING_PH1_AVG 0.00107054
+#define RING_PH2_AVG 2.11875E-08
+#define RING_PH1_VAR 5.81799999999999E-05 *2
+#define RING_PH2_VAR 6.5761E-09 *2
+#define TIE_PH1_AVG 0.00155887
+#define TIE_PH2_AVG 1.780055E-06
+#define TIE_PH1_VAR 8.27999999999998E-05 *2
+#define TIE_PH2_VAR 2.40715E-07 *2
+#define PANTS_PH1_AVG 0.001297275
+#define PANTS_PH2_AVG 4.32789E-07
+#define PANTS_PH1_VAR 0.000131785 *2
+#define PANTS_PH2_VAR 9.62E-08 *2
+#define SHIRT_PH1_AVG 0.0007930105
+#define SHIRT_PH2_AVG 6.54703E-08
+#define SHIRT_PH1_VAR 1.04975E-05 *2 
+#define SHIRT_PH2_VAR 1.10927E-08 *2
 
 using namespace std;
 using namespace cv;
@@ -198,8 +198,12 @@ std::vector<std::vector<double>> draw(const std::vector<cv::Moments>& moments, c
     huMoments.push_back(std::vector<double>());
     cv::HuMoments(moment, huMoments.back());
     double angle = 0.5*atan2(2*moment.mu11, moment.mu20-moment.mu02);
-    int xCenter = moment.m10/moment.m00;
-    int yCenter = moment.m01/moment.m00;
+    (huMoments.back()).push_back(angle);
+    double xCenter = moment.m10/moment.m00;
+    (huMoments.back()).push_back(xCenter);
+    double yCenter = moment.m01/moment.m00;
+    (huMoments.back()).push_back(yCenter);
+
     cv::circle(image, cv::Point(xCenter,yCenter), 3, (0,255,0), -1);
 
     int length = 100;
@@ -226,7 +230,7 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
 
   limits = filterHSV(image);
 
-  cv::inRange(hsvImage, cv::Scalar(limits[0], limits[2], limits[4]),
+  cv::inRange(image, cv::Scalar(limits[0], limits[2], limits[4]),
   cv::Scalar(limits[1], limits[3], limits[5]), filteredImage);
 
   cv::erode(filteredImage, filteredImage, cv::Mat());
@@ -248,11 +252,14 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
 
 
 void caracterize(std::vector<std::vector<double>> huMoments){
-  float phi1,phi2;
+  float phi1,phi2,angle,x,y;
   for(auto hu : huMoments){
     phi1 = hu[0];
     phi2 = hu[1];
-    cout << phi1 << " " << phi2 << endl;
+    angle = hu[7];
+    x = hu[8];
+    y = hu[9];
+    cout << phi1 << " " << phi2 << " " << angle << " (" << (int)x << "," << (int)y << ")" << endl;
     if(phi1 < RING_PH1_AVG + RING_PH1_VAR && phi1 > RING_PH1_AVG - RING_PH1_VAR){
       if(phi2 < RING_PH2_AVG + RING_PH2_VAR && phi2 > RING_PH2_AVG - RING_PH2_VAR){
         cout << "ANILLO" << endl;
