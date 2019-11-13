@@ -56,12 +56,29 @@ using namespace std::chrono;
 const int KEY_DELAY_MS = 50;
 const int DRONE_OUTPUT = 70;
 
+const char KEY_CALIBRATE = 'c';
+const char KEY_BEGIN = 'b';
+const char KEY_STOP_PROGRAM = 'x';
+const char KEY_TAKEOFF = 'o';
+const char KEY_LAND = 'p';
+const char KEY_MOVE_FORWARD = 'w';
+const char KEY_MOVE_BACK = 's';
+const char KEY_MOVE_LEFT = 'a';
+const char KEY_MOVE_RIGHT = 'd';
+const char KEY_TURN_LEFT = 'q';
+const char KEY_TURN_RIGHT = 'e';
+const char KEY_EMERGENCY_STOP = 'f';
+const char KEY_HOVER = 'r';
+const char KEY_SEQUENCE = 'k';
+
 const String WINDOW_ORIGINAL_NAME = "Original";
 const String WINDOW_FLIPPED_NAME = "Flipped";
 
 void flipImageBasic(const Mat &sourceImage, Mat &destinationImage);
 
 std::vector<cv::Vec3b> pixels;
+
+vector<int> limits = {55,145,126,216,99,189};
 
 void mouseEvent(int event, int x, int y, int flags, void* param) {
   cv::Mat* image = (cv::Mat*)param;
@@ -81,10 +98,12 @@ void mouseEvent(int event, int x, int y, int flags, void* param) {
 
 
 std::vector<int> filterHSV(const cv::Mat& hsvImage) {
-  std::vector<int> limits {0, 0, 0, 0, 0, 0};
   int data[3] = {0, 0, 0};
+  cv::Mat image = hsvImage;
+  cv::setMouseCallback("Image", mouseEvent, &image);
   cv::Mat filteredImage;
-  
+  pixels.clear();
+  GaussianBlur(hsvImage, hsvImage, Size(5, 5), 0);
   while (cv::waitKey(1) != 'x') {  
     if (pixels.size() >= FILTER_SAMPLE) {
       for (int i = 1; i <= FILTER_SAMPLE; i++) {
@@ -223,15 +242,10 @@ std::vector<std::vector<double>> draw(const std::vector<cv::Moments>& moments, c
   return huMoments;
 }
 
-std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
-  cv::setMouseCallback("Image", mouseEvent, &image);
-  pixels.clear();
+std::vector<std::vector<double>> getMoments(cv::Mat &image){
   cv::Mat filteredImage;
-  vector<int> limits {0, 0, 0, 0, 0, 0};
 
   GaussianBlur(image, image, Size(5, 5), 0);
-
-  limits = filterHSV(image);
 
   cv::inRange(image, cv::Scalar(limits[0], limits[2], limits[4]),
   cv::Scalar(limits[1], limits[3], limits[5]), filteredImage);
@@ -248,7 +262,6 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
   auto moments = selectiveSegmentation(filteredImage, WHITE);
   auto huMoments = draw(moments, filteredImage);
   imshow("Selective segmentation", filteredImage);
-  waitKey(0);
 
   return huMoments;
 }
@@ -350,7 +363,6 @@ int main(int argc, char *argv[])
   cv::Mat image;
   string space = "RGB";
   vector<bool> steps;
-  bool freeze = false;
   char key;
   int umbral = 127;
 
@@ -360,53 +372,102 @@ int main(int argc, char *argv[])
   high_resolution_clock::time_point lastKeyPress = high_resolution_clock::now();
   Mat currentImage, flippedImage, droneImage;
   
-  drone.takeoff();
-  usleep(3500000);
-  cout << "takeoff" << endl;
-
-  drone.hover();
-
-  while (true){
+  cout << "Battery Level: " << drone.getBatteryLevel() << endl;
+  int count = 0;
+  bool run = false;
+  bool stop = false;
+  bool calib = false;
+  while (!stop){
     
     currentTime = high_resolution_clock::now();
     /* Obtain a new frame from camera */
     droneImage = drone.getFrameAsMat();
-    if(!freeze) 
-      currentImage = droneImage.clone();
-    if(space == "HSV"){
-      cv::cvtColor(currentImage, image, CV_HSV2BGR);
-       
+    currentImage = droneImage.clone();
+    imshow("Drone", droneImage);
+    key = tolower(cv::waitKey(3));
+
+    cv::cvtColor(currentImage, image, CV_HSV2BGR);
+
+    if(calib){
       imshow("Image", image);
-
-      std::vector<std::vector<double>> huMoments;
-      huMoments = filterAndSegment(image);
-      steps = caracterize(huMoments);
-
-      space = "RGB";
-    }
-    else{
-      image = currentImage.clone();
+      limits = filterHSV(image);
+      for(auto limit : limits){
+        cout << limit << " ";
+      }
+      cout << endl;
+      calib = false;
     }
 
+    count++;
+    
+    std::vector<std::vector<double>> huMoments;
+    huMoments = getMoments(image);
 
-    imshow("Image", image);
-
-    key = waitKeyEx(3);
-    if (key == 'x'){
+    if (key == KEY_STOP_PROGRAM) {
       break;
     }
-    else if (key == 'f'){ 
-      freeze = !freeze;
+    if (key != -1) {
+      lastKeyPress = high_resolution_clock::now();
     }
-    else if (key == 'b'){ 
+    
+    if(run){
+      cout << "-----------------------------Run Caracterize------------------------\n\n";
+      steps = caracterize(huMoments);
       doRoutine(steps, drone);
+      //drone.land();
+      run = false;
+      break;
     }
-    else if (key == 'r'){
-      space = "RGB";
+    else{
+      caracterize(huMoments);
     }
-    else if (key == 'h'){
-      space = "HSV";
+    
+    switch (key) {
+      case KEY_CALIBRATE:
+        calib = !calib;
+        break;
+      case KEY_BEGIN:
+        run = !run;
+        break;
+      case KEY_TAKEOFF:
+        drone.takeoff();
+        break;
+      case KEY_LAND:
+        drone.land();
+        break;
+      case KEY_MOVE_FORWARD:
+        drone.setPitch(DRONE_OUTPUT);
+        break;
+      case KEY_MOVE_BACK:
+        drone.setPitch(-DRONE_OUTPUT);
+        break;
+      case KEY_MOVE_LEFT:
+        drone.setRoll(-DRONE_OUTPUT);
+        break;
+      case KEY_MOVE_RIGHT:
+        drone.setRoll(DRONE_OUTPUT);
+        break;
+      case KEY_TURN_LEFT:
+        drone.setYaw(-DRONE_OUTPUT);
+        break;
+      case KEY_TURN_RIGHT:
+        drone.setYaw(DRONE_OUTPUT);
+        break;
+      case KEY_EMERGENCY_STOP:
+        drone.emergencyStop();
+        break;
+      case KEY_HOVER:
+        drone.hover();
+        break;
+      default:
+        // If key delay has passed and no new keys have been pressed stop
+        // drone
+        duration<double, std::milli> time_span = currentTime - lastKeyPress;
+        if (time_span.count() > KEY_DELAY_MS) {
+          drone.hover();
+        }
+        break;
     }
   }
-  drone.land();
+  cout << "Battery Level: " << drone.getBatteryLevel() << endl;
 }
