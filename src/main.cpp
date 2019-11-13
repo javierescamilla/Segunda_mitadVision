@@ -46,6 +46,9 @@
 #define SHIRT_PH1_VAR 1.04975E-05 *2 
 #define SHIRT_PH2_VAR 1.10927E-08 *2
 
+#define DRONE_SPEED 50
+#define TIME_MOVE 2000000
+
 using namespace std;
 using namespace cv;
 using namespace std::chrono;
@@ -251,8 +254,9 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
 }
 
 
-void caracterize(std::vector<std::vector<double>> huMoments){
+vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
   float phi1,phi2,angle,x,y;
+  vector<bool> steps (3);
   for(auto hu : huMoments){
     phi1 = hu[0];
     phi2 = hu[1];
@@ -263,33 +267,89 @@ void caracterize(std::vector<std::vector<double>> huMoments){
     if(phi1 < RING_PH1_AVG + RING_PH1_VAR && phi1 > RING_PH1_AVG - RING_PH1_VAR){
       if(phi2 < RING_PH2_AVG + RING_PH2_VAR && phi2 > RING_PH2_AVG - RING_PH2_VAR){
         cout << "ANILLO" << endl;
+        steps[2] = false;//Atras
       } 
     }
     if(phi1 < TIE_PH1_AVG + TIE_PH1_VAR && phi1 > TIE_PH1_AVG - TIE_PH1_VAR){
       if(phi2 < TIE_PH2_AVG + TIE_PH2_VAR && phi2 > TIE_PH2_AVG - TIE_PH2_VAR){
         cout << "CORBATA" << endl;
+        steps[0] = false;//Izquierda
+        steps[1] = angle <= 0 && angle >= -1.5707963267949;
       } 
     }
     if(phi1 < PANTS_PH1_AVG + PANTS_PH1_VAR && phi1 > PANTS_PH1_AVG - PANTS_PH1_VAR){
       if(phi2 < PANTS_PH2_AVG + PANTS_PH2_VAR && phi2 > PANTS_PH2_AVG - PANTS_PH2_VAR){
         cout << "PANTALON" << endl;
+        steps[0] = true;//Derecha
+        if(angle >= -1.5707963267949 && angle <=0){
+          steps[1] = true;
+        }
+        else if(angle <= 1.5707963267949 && angle >0){
+          steps[1] = false;
+        }
       } 
     }
     if(phi1 < SHIRT_PH1_AVG + SHIRT_PH1_VAR && phi1 > SHIRT_PH1_AVG - SHIRT_PH1_VAR){
       if(phi2 < SHIRT_PH2_AVG + SHIRT_PH2_VAR && phi2 > SHIRT_PH2_AVG - SHIRT_PH2_VAR){
         cout << "PLAYERA" << endl;
+        steps[2] = true;//Adelante
       } 
     }
   }
+  return steps;
 }
 
-
+void doRoutine(vector<bool> steps, BebopDrone &drone){
+  if(steps[0]){
+    cout << "right\n";
+    drone.setRoll(DRONE_SPEED);
+    usleep(TIME_MOVE);
+    drone.hover();
+    usleep(2000000);
+  }
+  else{
+    cout << "left\n";
+    drone.setRoll(-DRONE_SPEED);
+    usleep(TIME_MOVE);
+    drone.hover();
+    usleep(2000000);
+  }
+  if(steps[1]){
+    cout << "arriba\n";
+    drone.setVerticalSpeed(DRONE_SPEED);
+    usleep(TIME_MOVE*0.5);
+    drone.hover();
+    usleep(2000000);
+  }
+  else{
+    cout << "abajo\n";
+    drone.setVerticalSpeed(-DRONE_SPEED);
+    usleep(TIME_MOVE*0.5);
+    drone.hover();
+    usleep(2000000);
+  }
+  if(steps[2]){
+    cout << "adelante\n";
+    drone.setPitch(DRONE_SPEED);
+    usleep(TIME_MOVE);
+    drone.hover();
+    usleep(2000000);
+  }
+  else{
+    cout << "atras\n";
+    drone.setPitch(-DRONE_SPEED);
+    usleep(TIME_MOVE);
+    drone.hover();
+    usleep(2000000);
+  }
+}
 
 int main(int argc, char *argv[])
 {
   /* Create images where captured and transformed frames are going to be stored */
   cv::Mat image;
   string space = "RGB";
+  vector<bool> steps;
   bool freeze = false;
   char key;
   int umbral = 127;
@@ -300,11 +360,11 @@ int main(int argc, char *argv[])
   high_resolution_clock::time_point lastKeyPress = high_resolution_clock::now();
   Mat currentImage, flippedImage, droneImage;
   
-  //drone.takeoff();
+  drone.takeoff();
   usleep(3500000);
   cout << "takeoff" << endl;
 
-  //drone.hover();
+  drone.hover();
 
   while (true){
     
@@ -320,7 +380,7 @@ int main(int argc, char *argv[])
 
       std::vector<std::vector<double>> huMoments;
       huMoments = filterAndSegment(image);
-      caracterize(huMoments);
+      steps = caracterize(huMoments);
 
       space = "RGB";
     }
@@ -338,6 +398,9 @@ int main(int argc, char *argv[])
     else if (key == 'f'){ 
       freeze = !freeze;
     }
+    else if (key == 'b'){ 
+      doRoutine(steps, drone);
+    }
     else if (key == 'r'){
       space = "RGB";
     }
@@ -345,5 +408,5 @@ int main(int argc, char *argv[])
       space = "HSV";
     }
   }
-  //drone.land();
+  drone.land();
 }
