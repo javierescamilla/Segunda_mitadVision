@@ -17,6 +17,8 @@
 #define FILTER_SAMPLE 15
 #define TOLERANCE 45
 
+#define MINIMUM_AREA 30000
+
 #define BLACK cv::Vec3b(0, 0, 0)
 #define BLUE cv::Vec3b(0, 255, 0)
 #define GREEN cv::Vec3b(255, 0, 0)
@@ -26,6 +28,23 @@
 #define RED cv::Vec3b(0, 0, 255)
 #define THRESHOLD 127
 #define WHITE cv::Vec3b(255, 255, 255)
+
+#define RING_PH1_AVG 3.41E-03
+#define RING_PH2_AVG 4.30E-07
+#define RING_PH1_VAR 0.0003152529 * 1.5
+#define RING_PH2_VAR 0.000000099 * 2
+#define TIE_PH1_AVG 1.40E-03
+#define TIE_PH2_AVG 1.33E-06
+#define TIE_PH1_VAR 4.25E-05 * 1.5
+#define TIE_PH2_VAR 1.0679222222222E-07 * 2
+#define PANTS_PH1_AVG 1.11E-03
+#define PANTS_PH2_AVG 3.12E-07
+#define PANTS_PH1_VAR 0.00010127 * 1.5
+#define PANTS_PH2_VAR 0.000000064 * 2
+#define SHIRT_PH1_AVG 7.71E-04
+#define SHIRT_PH2_AVG 7.05E-08
+#define SHIRT_PH1_VAR 0.000004617 * 2
+#define SHIRT_PH2_VAR 6.8197E-09 * 8
 
 using namespace std;
 using namespace cv;
@@ -228,6 +247,36 @@ std::vector<std::vector<double>> filterAndSegment(cv::Mat &image){
 }
 
 
+void caracterize(std::vector<std::vector<double>> huMoments){
+  float phi1,phi2;
+  for(auto hu : huMoments){
+    phi1 = hu[0];
+    phi2 = hu[1];
+    cout << phi1 << " " << phi2 << endl;
+    if(phi1 < RING_PH1_AVG + RING_PH1_VAR && phi1 > RING_PH1_AVG - RING_PH1_VAR){
+      if(phi2 < RING_PH2_AVG + RING_PH2_VAR && phi2 > RING_PH2_AVG - RING_PH2_VAR){
+        cout << "ANILLO" << endl;
+      } 
+    }
+    if(phi1 < TIE_PH1_AVG + TIE_PH1_VAR && phi1 > TIE_PH1_AVG - TIE_PH1_VAR){
+      if(phi2 < TIE_PH2_AVG + TIE_PH2_VAR && phi2 > TIE_PH2_AVG - TIE_PH2_VAR){
+        cout << "CORBATA" << endl;
+      } 
+    }
+    if(phi1 < PANTS_PH1_AVG + PANTS_PH1_VAR && phi1 > PANTS_PH1_AVG - PANTS_PH1_VAR){
+      if(phi2 < PANTS_PH2_AVG + PANTS_PH2_VAR && phi2 > PANTS_PH2_AVG - PANTS_PH2_VAR){
+        cout << "PANTALON" << endl;
+      } 
+    }
+    if(phi1 < SHIRT_PH1_AVG + SHIRT_PH1_VAR && phi1 > SHIRT_PH1_AVG - SHIRT_PH1_VAR){
+      if(phi2 < SHIRT_PH2_AVG + SHIRT_PH2_VAR && phi2 > SHIRT_PH2_AVG - SHIRT_PH2_VAR){
+        cout << "PLAYERA" << endl;
+      } 
+    }
+  }
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -264,6 +313,7 @@ int main(int argc, char *argv[])
 
       std::vector<std::vector<double>> huMoments;
       huMoments = filterAndSegment(image);
+      caracterize(huMoments);
 
       space = "RGB";
     }
