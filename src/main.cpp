@@ -12,7 +12,9 @@
 #include <random>
 #include <queue>
 #include <string>
+#include <utility>
 #include <stdlib.h>
+#include <climits>
 
 #define FILTER_SAMPLE 15
 #define TOLERANCE 45
@@ -20,8 +22,8 @@
 #define MINIMUM_AREA 30000
 
 #define BLACK cv::Vec3b(0, 0, 0)
-#define BLUE cv::Vec3b(0, 255, 0)
-#define GREEN cv::Vec3b(255, 0, 0)
+#define BLUE cv::Vec3b(255, 0, 0)
+#define GREEN cv::Vec3b(0, 255, 0)
 #define MAX_VALUE 255
 #define RANDOM_COLOR_MAX 200
 #define RANDOM_COLOR_MIN 50
@@ -41,13 +43,39 @@
 #define PANTS_PH2_AVG 4.32789E-07
 #define PANTS_PH1_VAR 0.000131785 *2
 #define PANTS_PH2_VAR 9.62E-08 *2
-#define SHIRT_PH1_AVG 0.0007930105
+#define SHIRT_PH1_AVG 0.000776667
 #define SHIRT_PH2_AVG 6.54703E-08
-#define SHIRT_PH1_VAR 1.04975E-05 *2 
+#define SHIRT_PH1_VAR 2.6841E-05 *2 
 #define SHIRT_PH2_VAR 1.10927E-08 *2
+
+#define xMinRing 130
+#define xMaxRing 249
+#define yMinRing 0
+#define yMaxRing 3
+#define xMinTie 354
+#define xMaxTie 512
+#define yMinTie 206
+#define yMaxTie 361
+#define xMinPants 170
+#define xMaxPants 440
+#define yMinPants 36
+#define yMaxPants 96
+#define xMinShirt 11
+#define xMaxShirt 66
+#define yMinShirt 4
+#define yMaxShirt 11
+#define xMeanRing 189
+#define xMeanTie 439
+#define xMeanPants 305
+#define xMeanShirt 39
+#define yMeanRing 1
+#define yMeanTie 284
+#define yMeanPants 67
+#define yMeanShirt 8
 
 #define DRONE_SPEED 50
 #define TIME_MOVE 2000000
+#define TIME_IN_CM 200000
 
 using namespace std;
 using namespace cv;
@@ -78,7 +106,9 @@ void flipImageBasic(const Mat &sourceImage, Mat &destinationImage);
 
 std::vector<cv::Vec3b> pixels;
 
-vector<int> limits = {55,145,126,216,99,189};
+std::vector<cv::Vec3b> listColor;
+
+vector<int> limits = {32,122,132,222,75,165};
 
 void mouseEvent(int event, int x, int y, int flags, void* param) {
   cv::Mat* image = (cv::Mat*)param;
@@ -200,12 +230,14 @@ std::vector<cv::Moments> selectiveSegmentation(cv::Mat& image, const cv::Vec3b& 
   std::vector<cv::Moments> moments;
 
   int numTriesToDetectObject = 0;
+  listColor.clear();
   while(numTriesToDetectObject < image.cols * image.rows) {
     row = randomRow(rng);
     col = randomCol(rng);
     numTriesToDetectObject++;
     if (image.at<cv::Vec3b>(row, col) == objectColor) {
       cv::Vec3b color = getRandomColor(RANDOM_COLOR_MIN, RANDOM_COLOR_MAX);
+      listColor.push_back(color);
       moments.push_back(expandColor(row, col, image, color, objectColor));
       numTriesToDetectObject = 0;
     }
@@ -242,6 +274,67 @@ std::vector<std::vector<double>> draw(const std::vector<cv::Moments>& moments, c
   return huMoments;
 }
 
+int getPosPhi1(double x)
+{
+  int pos = (int)((x - 0.0007) * 512.0 / (0.0017- 0.0007));
+  if (pos > 512) pos = 512;
+  if (pos < 0) pos = 0;
+  return pos;
+}
+
+int getPosPhi2(double x)
+{
+  return (int)((x - 1.4E-8) * 400.0 / (2.5E-6 - 1.4E-8));
+}
+
+void drawSquare(cv::Mat &image, int xMin, int xAv, int xMax, int yMin, int yAv, int yMax, cv::Scalar color){
+  cv::line(image, cv::Point(xAv, yMin), cv::Point(xMax, yAv), color);
+  cv::line(image, cv::Point(xMax, yAv), cv::Point(xAv, yMax), color);
+  cv::line(image, cv::Point(xAv, yMax), cv::Point(xMin, yAv), color);
+  cv::line(image, cv::Point(xMin, yAv), cv::Point(xAv, yMin), color);
+}
+
+void flipImageBasic(const Mat &sourceImage, Mat &destinationImage)
+{
+  if (destinationImage.empty())
+    destinationImage = Mat(sourceImage.rows, sourceImage.cols, sourceImage.type());
+
+  for (int x = 0; x < sourceImage.cols; ++x)
+    for (int y = 0; y < sourceImage.rows / 2; ++y)
+      for (int i = 0; i < sourceImage.channels(); ++i)
+      {
+        destinationImage.at<Vec3b>(y, x)[i] = sourceImage.at<Vec3b>(sourceImage.rows-1-y, x)[i];
+        destinationImage.at<Vec3b>(sourceImage.rows-1-y, x)[i] = sourceImage.at<Vec3b>(y, x)[i];
+      }
+}
+
+void drawGraph(std::vector<std::vector<double>> hM){
+  int graph_w = 512; int graph_h = 400;
+  
+  Mat graph( graph_h, graph_w, CV_8UC3, Scalar( 0,0,0) );
+  Mat flipped = graph.clone();
+  
+  drawSquare(graph, xMinRing, xMeanRing, xMaxRing, yMinRing, yMeanRing, yMaxRing, cv::Scalar(0,255,255));
+  drawSquare(graph, xMinTie, xMeanTie, xMaxTie, yMinTie, yMeanTie, yMaxTie, cv::Scalar(255,255,0));
+  drawSquare(graph, xMinPants, xMeanPants, xMaxPants, yMinPants, yMeanPants, yMaxPants, cv::Scalar(0,0,255));
+  drawSquare(graph, xMinShirt, xMeanShirt, xMaxShirt, yMinShirt, yMeanShirt, yMaxShirt, cv::Scalar(200,200,200));
+  
+  for( int i = 0; i < hM.size(); i++ ){
+    int xPos = getPosPhi1(hM[i][0]);
+    int yPos = getPosPhi2(hM[i][1]);
+    if (xPos <= 512 && xPos >= 0){
+      if (yPos <= 400 && yPos >= 0){
+        circle(graph, cv::Point(xPos, yPos), 3, listColor[i], CV_FILLED);
+      }
+    }
+  }
+    
+  flipImageBasic(graph, flipped);
+
+  namedWindow("Clasificacion", CV_WINDOW_AUTOSIZE );
+  imshow("Clasificacion", flipped );
+}
+
 std::vector<std::vector<double>> getMoments(cv::Mat &image){
   cv::Mat filteredImage;
 
@@ -262,14 +355,16 @@ std::vector<std::vector<double>> getMoments(cv::Mat &image){
   auto moments = selectiveSegmentation(filteredImage, WHITE);
   auto huMoments = draw(moments, filteredImage);
   imshow("Selective segmentation", filteredImage);
+  
+  drawGraph(huMoments);
 
   return huMoments;
 }
 
-
 vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
   float phi1,phi2,angle,x,y;
   vector<bool> steps (3);
+  cout << "------------------------------------------------------------------------------------\n"; 
   for(auto hu : huMoments){
     phi1 = hu[0];
     phi2 = hu[1];
@@ -309,51 +404,107 @@ vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
       } 
     }
   }
+
   return steps;
 }
 
-void doRoutine(vector<bool> steps, BebopDrone &drone){
-  if(steps[0]){
-    cout << "right\n";
-    drone.setRoll(DRONE_SPEED);
-    usleep(TIME_MOVE);
-    drone.hover();
-    usleep(2000000);
-  }
-  else{
-    cout << "left\n";
+void moveInCm(string direction, BebopDrone &drone, cv::Point &position, cv::Mat &droneMap){
+  cv::Point lastPosition(position.x, position.y);
+  if(direction == "left"){
     drone.setRoll(-DRONE_SPEED);
-    usleep(TIME_MOVE);
-    drone.hover();
-    usleep(2000000);
+    position.x -= 10;
   }
-  if(steps[1]){
-    cout << "arriba\n";
-    drone.setVerticalSpeed(DRONE_SPEED);
-    usleep(TIME_MOVE*0.5);
-    drone.hover();
-    usleep(2000000);
+  else if(direction == "right"){
+    drone.setRoll(DRONE_SPEED);
+    position.x += 10;
   }
-  else{
-    cout << "abajo\n";
-    drone.setVerticalSpeed(-DRONE_SPEED);
-    usleep(TIME_MOVE*0.5);
-    drone.hover();
-    usleep(2000000);
-  }
-  if(steps[2]){
-    cout << "adelante\n";
-    drone.setPitch(DRONE_SPEED);
-    usleep(TIME_MOVE);
-    drone.hover();
-    usleep(2000000);
-  }
-  else{
-    cout << "atras\n";
+  else if(direction == "back"){
     drone.setPitch(-DRONE_SPEED);
-    usleep(TIME_MOVE);
-    drone.hover();
-    usleep(2000000);
+    position.y += 10;
+  }
+  else if(direction == "forward"){
+    drone.setPitch(DRONE_SPEED);
+    position.y -= 10;
+  }
+  else{
+    cout << "Incorrect direction.\n";
+    return;
+  }
+  usleep(TIME_IN_CM);
+  drone.hover();
+  cv::line(droneMap, lastPosition, position, RED);
+  imshow("Drone map",droneMap);
+  waitKey(200);
+}
+
+void drawMaps(cv::Mat &objectMap, cv::Mat &droneMap, cv::Mat &NF1Map, vector<bool> steps){
+  bool isWayFree[5][3];
+  cv::Mat temporal( 410, 410, CV_8UC3, Scalar( 255,255,255) );
+  objectMap = temporal.clone();
+  cv::circle(objectMap, cv::Point(205, 123), 13, BLACK, CV_FILLED);
+  cv::circle(objectMap, cv::Point(205, 287), 13, BLACK, CV_FILLED);
+  droneMap = objectMap.clone();
+  cv::circle(droneMap, cv::Point(205, 123), 22, BLACK, CV_FILLED);
+  cv::circle(droneMap, cv::Point(205, 287), 22, BLACK, CV_FILLED);
+  NF1Map = droneMap.clone();
+  cv::line(NF1Map, cv::Point(0, 82), cv::Point(410, 82), BLACK);
+  cv::line(NF1Map, cv::Point(0, 164), cv::Point(410, 164), BLACK);
+  cv::line(NF1Map, cv::Point(0, 246), cv::Point(410, 246), BLACK);
+  cv::line(NF1Map, cv::Point(0, 328), cv::Point(410, 328), BLACK);
+  cv::line(NF1Map, cv::Point(137, 0), cv::Point(137, 410), BLACK);
+  cv::line(NF1Map, cv::Point(274, 0), cv::Point(274, 410), BLACK);
+  for(int i = 0; i < 5; i++){
+    for(int j = 0; j < 3; j++){
+      if(NF1Map.at<Vec3b>(i*82+41, j*137+68)[0] == 0){
+        rectangle(NF1Map, cv::Point(j*137-1, i*82-1), cv::Point((j+1)*137-1, (i+1)*82-1), cv::Scalar(0,0,0), CV_FILLED);
+        isWayFree[i][j] = false;
+      }
+      else{
+        isWayFree[i][j] = true;
+      }
+    } 
+  }
+  if(steps[0]){
+    rectangle(NF1Map, cv::Point(1,409), cv::Point(136,329), cv::Scalar(127,127,127), CV_FILLED);
+    rectangle(NF1Map, cv::Point(1,327), cv::Point(136,247), cv::Scalar(127,127,127), CV_FILLED);
+    rectangle(NF1Map, cv::Point(1,245), cv::Point(136,165), cv::Scalar(127,127,127), CV_FILLED);
+    if(steps[2]){
+      rectangle(NF1Map, cv::Point(138,245), cv::Point(273,165), cv::Scalar(127,127,127), CV_FILLED);
+    }
+    else{
+      rectangle(NF1Map, cv::Point(1,163), cv::Point(136,83), cv::Scalar(127,127,127), CV_FILLED);
+      rectangle(NF1Map, cv::Point(1,81), cv::Point(136,1), cv::Scalar(127,127,127), CV_FILLED);
+      rectangle(NF1Map, cv::Point(138,81), cv::Point(273,1), cv::Scalar(127,127,127), CV_FILLED);
+    }
+  }
+  else{
+    rectangle(NF1Map, cv::Point(275,409), cv::Point(409,329), cv::Scalar(127,127,127), CV_FILLED);
+    rectangle(NF1Map, cv::Point(275,327), cv::Point(409,247), cv::Scalar(127,127,127), CV_FILLED);
+    rectangle(NF1Map, cv::Point(275,245), cv::Point(409,165), cv::Scalar(127,127,127), CV_FILLED);
+    if(steps[2]){
+      rectangle(NF1Map, cv::Point(138,245), cv::Point(273,165), cv::Scalar(127,127,127), CV_FILLED);
+    }
+    else{
+      rectangle(NF1Map, cv::Point(275,163), cv::Point(409,83), cv::Scalar(127,127,127), CV_FILLED);
+      rectangle(NF1Map, cv::Point(275,81), cv::Point(409,1), cv::Scalar(127,127,127), CV_FILLED);
+      rectangle(NF1Map, cv::Point(138,81), cv::Point(273,1), cv::Scalar(127,127,127), CV_FILLED);
+    }
+  }
+  imshow("Object map", objectMap);
+  imshow("Drone map", droneMap);
+  imshow("NF! map", NF1Map);
+}
+
+void doRoutine(vector<bool> steps, BebopDrone &drone, cv::Mat droneMap){
+
+  cv::Point position(205, 369);
+  
+
+  for(int i = 0; i < 5; i++){
+    moveInCm("right", drone, position, droneMap);
+  }
+  for(int i = 0; i < 10; i++){
+    moveInCm("forward", drone, position, droneMap);
   }
 }
 
@@ -361,10 +512,16 @@ int main(int argc, char *argv[])
 {
   /* Create images where captured and transformed frames are going to be stored */
   cv::Mat image;
+  cv::Mat objectMap; 
+  cv::Mat droneMap; 
+  cv::Mat NF1Map;
   string space = "RGB";
+  vector<pair<string,int>> path;
   vector<bool> steps;
   char key;
   int umbral = 127;
+
+  VideoCapture camera = VideoCapture(0);
 
   BebopDrone &drone = BebopDrone::getInstance();
 
@@ -413,10 +570,14 @@ int main(int argc, char *argv[])
     if(run){
       cout << "-----------------------------Run Caracterize------------------------\n\n";
       steps = caracterize(huMoments);
-      doRoutine(steps, drone);
-      //drone.land();
+      usleep(2000000);
+      path.clear();
+      drawMaps(objectMap, droneMap, NF1Map, steps);
+      waitKey(0);
+      doRoutine(steps, drone, droneMap);
+      drone.land();
       run = false;
-      break;
+      //break;
     }
     else{
       caracterize(huMoments);
