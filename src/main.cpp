@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <climits>
 
-#define RESTRICT_MOVEMENT 0.5 //Debe ser 1 para la presentación
+#define RESTRICT_MOVEMENT 1 //Debe ser 1 para la presentación
 
 #define FILTER_SAMPLE 15
 #define TOLERANCE 45
@@ -410,24 +410,23 @@ vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
   return steps;
 }
 
-<<<<<<< HEAD
 void moveInCm(string direction, BebopDrone &drone, cv::Point &position, cv::Mat &droneMap){
   cv::Point lastPosition(position.x, position.y);
   if(direction == "left"){
     drone.setRoll(-DRONE_SPEED);
-    position.x -= 10;
+    position.x += 10;
   }
   else if(direction == "right"){
     drone.setRoll(DRONE_SPEED);
-    position.x += 10;
+    position.x -= 10;
   }
   else if(direction == "back"){
     drone.setPitch(-DRONE_SPEED);
-    position.y += 10;
+    position.y -= 10;
   }
   else if(direction == "forward"){
     drone.setPitch(DRONE_SPEED);
-    position.y -= 10;
+    position.y += 10;
   }
   else{
     cout << "Incorrect direction.\n";
@@ -467,7 +466,7 @@ void drawMaps(cv::Mat &objectMap, cv::Mat &droneMap, cv::Mat &NF1Map, vector<boo
       }
     } 
   }
-  if(steps[0]){
+  if(!steps[0]){
     rectangle(NF1Map, cv::Point(1,409), cv::Point(136,329), cv::Scalar(127,127,127), CV_FILLED);
     rectangle(NF1Map, cv::Point(1,327), cv::Point(136,247), cv::Scalar(127,127,127), CV_FILLED);
     rectangle(NF1Map, cv::Point(1,245), cv::Point(136,165), cv::Scalar(127,127,127), CV_FILLED);
@@ -498,7 +497,7 @@ void drawMaps(cv::Mat &objectMap, cv::Mat &droneMap, cv::Mat &NF1Map, vector<boo
   imshow("NF! map", NF1Map);
 }
 
-void doRoutine(vector<bool> steps, BebopDrone &drone){
+void doRoutine(vector<bool> steps, BebopDrone &drone, cv::Mat &droneMap){
   cv::Point position(205, 369);
 
   //Se mueve a la izquierda o derecha
@@ -509,7 +508,7 @@ void doRoutine(vector<bool> steps, BebopDrone &drone){
   }
   else{
     for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
-      moveInCm("rigth", drone, position, droneMap);
+      moveInCm("right", drone, position, droneMap);
     }
   }
 
@@ -528,12 +527,12 @@ void doRoutine(vector<bool> steps, BebopDrone &drone){
   //Va a F1 o F2
   if(steps[2]){
     for(int i = 0; i < 16*RESTRICT_MOVEMENT; i++){
-      moveInCm("backward", drone, position, droneMap);
+      moveInCm("back", drone, position, droneMap);
     }
   }
   else{
     for(int i = 0; i < 33*RESTRICT_MOVEMENT; i++){
-      moveInCm("backward", drone, position, droneMap);
+      moveInCm("back", drone, position, droneMap);
     }
   }
 
@@ -542,7 +541,7 @@ void doRoutine(vector<bool> steps, BebopDrone &drone){
   //Entra a la posicion final
   if(steps[0]){
     for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
-      moveInCm("rigth", drone, position, droneMap);
+      moveInCm("right", drone, position, droneMap);
     }
   }
   else{
