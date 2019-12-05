@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <climits>
 
+#define RESTRICT_MOVEMENT 0.5 //Debe ser 1 para la presentación
+
 #define FILTER_SAMPLE 15
 #define TOLERANCE 45
 
@@ -375,7 +377,7 @@ vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
     if(phi1 < RING_PH1_AVG + RING_PH1_VAR && phi1 > RING_PH1_AVG - RING_PH1_VAR){
       if(phi2 < RING_PH2_AVG + RING_PH2_VAR && phi2 > RING_PH2_AVG - RING_PH2_VAR){
         cout << "ANILLO" << endl;
-        steps[2] = false;//Atras
+        steps[2] = false;//F2
       } 
     }
     if(phi1 < TIE_PH1_AVG + TIE_PH1_VAR && phi1 > TIE_PH1_AVG - TIE_PH1_VAR){
@@ -400,7 +402,7 @@ vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
     if(phi1 < SHIRT_PH1_AVG + SHIRT_PH1_VAR && phi1 > SHIRT_PH1_AVG - SHIRT_PH1_VAR){
       if(phi2 < SHIRT_PH2_AVG + SHIRT_PH2_VAR && phi2 > SHIRT_PH2_AVG - SHIRT_PH2_VAR){
         cout << "PLAYERA" << endl;
-        steps[2] = true;//Adelante
+        steps[2] = true;//F1
       } 
     }
   }
@@ -408,6 +410,7 @@ vector<bool> caracterize(std::vector<std::vector<double>> huMoments){
   return steps;
 }
 
+<<<<<<< HEAD
 void moveInCm(string direction, BebopDrone &drone, cv::Point &position, cv::Mat &droneMap){
   cv::Point lastPosition(position.x, position.y);
   if(direction == "left"){
@@ -495,16 +498,57 @@ void drawMaps(cv::Mat &objectMap, cv::Mat &droneMap, cv::Mat &NF1Map, vector<boo
   imshow("NF! map", NF1Map);
 }
 
-void doRoutine(vector<bool> steps, BebopDrone &drone, cv::Mat droneMap){
-
+void doRoutine(vector<bool> steps, BebopDrone &drone){
   cv::Point position(205, 369);
-  
 
-  for(int i = 0; i < 5; i++){
-    moveInCm("right", drone, position, droneMap);
+  //Se mueve a la izquierda o derecha
+  if(steps[0]){
+    for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
+      moveInCm("left", drone, position, droneMap);
+    }
   }
-  for(int i = 0; i < 10; i++){
-    moveInCm("forward", drone, position, droneMap);
+  else{
+    for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
+      moveInCm("rigth", drone, position, droneMap);
+    }
+  }
+
+  usleep(2000000);
+
+  //Sube o baja
+  if(steps[1])
+    drone.setVerticalSpeed(DRONE_SPEED);
+  else
+    drone.setVerticalSpeed(-DRONE_SPEED);
+  usleep(TIME_MOVE*0.5);
+  drone.hover();
+
+  usleep(2000000);
+
+  //Va a F1 o F2
+  if(steps[2]){
+    for(int i = 0; i < 16*RESTRICT_MOVEMENT; i++){
+      moveInCm("backward", drone, position, droneMap);
+    }
+  }
+  else{
+    for(int i = 0; i < 33*RESTRICT_MOVEMENT; i++){
+      moveInCm("backward", drone, position, droneMap);
+    }
+  }
+
+  usleep(2000000);
+
+  //Entra a la posicion final
+  if(steps[0]){
+    for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
+      moveInCm("rigth", drone, position, droneMap);
+    }
+  }
+  else{
+    for(int i = 0; i < 12*RESTRICT_MOVEMENT; i++){
+      moveInCm("left", drone, position, droneMap);
+    }
   }
 }
 
